@@ -6,6 +6,7 @@ class RationFeed {
     required this.asFedKg,
     this.dryMatterPercent,
     this.energyMjPerKgDm,
+    this.energySystem,
     this.crudeProteinPercentDm,
     this.ndfPercentDm,
     this.maxDailyAsFedKg,
@@ -16,6 +17,8 @@ class RationFeed {
   final double asFedKg;
   final double? dryMatterPercent;
   final double? energyMjPerKgDm;
+  /// ME (metabolizable energy) or another explicit system.
+  final String? energySystem;
   final double? crudeProteinPercentDm;
   final double? ndfPercentDm;
   final double? maxDailyAsFedKg;
@@ -40,6 +43,7 @@ class RationTargets {
   const RationTargets({
     required this.dryMatterKg,
     required this.energyMj,
+    required this.energySystem,
     required this.proteinKg,
     required this.ndfKg,
     required this.source,
@@ -48,6 +52,7 @@ class RationTargets {
 
   final NumericRange dryMatterKg;
   final NumericRange energyMj;
+  final String energySystem;
   final NumericRange proteinKg;
   final NumericRange ndfKg;
   final String source;
@@ -137,6 +142,14 @@ class RationCalculator {
       }
       final portionDm = feed.asFedKg * dm / 100;
       if (dmKg != null) dmKg += portionDm;
+      if (feed.energyMjPerKgDm != null &&
+          (feed.energySystem == null ||
+              feed.energySystem!.trim().isEmpty ||
+              (targets != null && feed.energySystem != targets.energySystem))) {
+        invalid = true;
+        energyMj = null;
+        warnings.add('نظام الطاقة مفقود أو غير مطابق للعلف: ${feed.name}.');
+      }
       if (feed.energyMjPerKgDm == null ||
           !feed.energyMjPerKgDm!.isFinite ||
           feed.energyMjPerKgDm! < 0) {
