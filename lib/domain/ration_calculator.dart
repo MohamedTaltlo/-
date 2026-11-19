@@ -112,6 +112,7 @@ class RationCalculator {
     double? energyMj = 0;
     double? proteinKg = 0;
     double? ndfKg = 0;
+    String? expectedEnergySystem = targets?.energySystem;
 
     for (final feed in feeds) {
       if (!feed.asFedKg.isFinite || feed.asFedKg <= 0) {
@@ -127,7 +128,8 @@ class RationCalculator {
         invalid = true;
         warnings.add('تجاوزت الكمية الحد الذي أدخلته للعلف: ${feed.name}.');
       }
-      if (feed.analysisSource.trim().isEmpty) {
+      if (feed.analysisSource.trim().isEmpty ||
+          feed.analysisSource == 'غير متوفر') {
         warnings.add('مصدر تحليل العلف غير مسجل: ${feed.name}.');
       }
       final dm = feed.dryMatterPercent;
@@ -143,9 +145,15 @@ class RationCalculator {
       final portionDm = feed.asFedKg * dm / 100;
       if (dmKg != null) dmKg += portionDm;
       if (feed.energyMjPerKgDm != null &&
+          expectedEnergySystem == null &&
+          feed.energySystem != null &&
+          feed.energySystem!.trim().isNotEmpty) {
+        expectedEnergySystem = feed.energySystem;
+      }
+      if (feed.energyMjPerKgDm != null &&
           (feed.energySystem == null ||
               feed.energySystem!.trim().isEmpty ||
-              (targets != null && feed.energySystem != targets.energySystem))) {
+              feed.energySystem != expectedEnergySystem)) {
         invalid = true;
         energyMj = null;
         warnings.add('نظام الطاقة مفقود أو غير مطابق للعلف: ${feed.name}.');
