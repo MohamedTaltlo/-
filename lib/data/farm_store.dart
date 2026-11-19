@@ -167,8 +167,9 @@ class FarmStore {
     });
   }
 
-  Future<void> deleteFeed(int id) async =>
-      db.delete('feeds', where: 'id = ?', whereArgs: [id]);
+  Future<void> deleteFeed(int id) async {
+    await db.delete('feeds', where: 'id = ?', whereArgs: [id]);
+  }
 
   Future<Map<String, Object?>?> target(int animalId) async {
     final rows = await db.query(
@@ -224,8 +225,9 @@ class FarmStore {
   Future<List<Map<String, Object?>>> rationItems(int rationId) =>
       db.query('ration_items', where: 'ration_id = ?', whereArgs: [rationId]);
 
-  Future<void> deleteRation(int rationId) async =>
-      db.delete('rations', where: 'id = ?', whereArgs: [rationId]);
+  Future<void> deleteRation(int rationId) async {
+    await db.delete('rations', where: 'id = ?', whereArgs: [rationId]);
+  }
 
   Future<void> close() => db.close();
 }
