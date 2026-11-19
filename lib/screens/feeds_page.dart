@@ -24,24 +24,24 @@ class _FeedsPageState extends State<FeedsPage> {
     if (mounted) setState(() => records = data);
   }
 
-  Future<void> add() async {
-    final name = TextEditingController();
-    final category = TextEditingController();
-    final stock = TextEditingController();
-    final price = TextEditingController();
-    final dm = TextEditingController();
-    final energy = TextEditingController();
-    final cp = TextEditingController();
-    final ndf = TextEditingController();
-    final dailyMax = TextEditingController();
-    final sourceNote = TextEditingController();
-    final analyzedAt = TextEditingController();
-    var sourceType = 'غير متوفر';
+  Future<void> add([Map<String, Object?>? existing]) async {
+    final name = TextEditingController(text: existing?['name']?.toString() ?? '');
+    final category = TextEditingController(text: existing?['category']?.toString() ?? '');
+    final stock = TextEditingController(text: existing?['stock_kg']?.toString() ?? '');
+    final price = TextEditingController(text: existing?['price_per_kg']?.toString() ?? '');
+    final dm = TextEditingController(text: existing?['dm_percent']?.toString() ?? '');
+    final energy = TextEditingController(text: existing?['energy_mj_kg_dm']?.toString() ?? '');
+    final cp = TextEditingController(text: existing?['cp_percent_dm']?.toString() ?? '');
+    final ndf = TextEditingController(text: existing?['ndf_percent_dm']?.toString() ?? '');
+    final dailyMax = TextEditingController(text: existing?['max_daily_kg']?.toString() ?? '');
+    final sourceNote = TextEditingController(text: existing?['source_note']?.toString() ?? '');
+    final analyzedAt = TextEditingController(text: existing?['analyzed_at']?.toString() ?? '');
+    var sourceType = (existing?['source_type'] ?? 'غير متوفر').toString();
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(builder: (context, change) {
         return AlertDialog(
-          title: const Text('إضافة علف وتحليله'),
+          title: Text(existing == null ? 'إضافة علف وتحليله' : 'تعديل العلف وتحليله'),
           content: SizedBox(
             width: 440,
             child: SingleChildScrollView(
@@ -98,12 +98,13 @@ class _FeedsPageState extends State<FeedsPage> {
                 return;
               }
               try {
-                await widget.store.addFeed({
+                final feedData = <String, Object?>{
                   'name': name.text.trim(),
                   'category': category.text.trim().isEmpty ? 'غير مصنف' : category.text.trim(),
                   'stock_kg': parseNumber(stock.text),
                   'price_per_kg': parseNumber(price.text),
-                }, {
+                };
+                final analysisData = <String, Object?>{
                   'dm_percent': parseNumber(dm.text),
                   'energy_mj_kg_dm': parseNumber(energy.text),
                   'energy_system': energy.text.trim().isEmpty ? null : 'ME',
@@ -113,7 +114,12 @@ class _FeedsPageState extends State<FeedsPage> {
                   'source_type': sourceType,
                   'source_note': sourceNote.text.trim(),
                   'analyzed_at': analyzedAt.text.trim().isEmpty ? null : analyzedAt.text.trim(),
-                });
+                };
+                if (existing == null) {
+                  await widget.store.addFeed(feedData, analysisData);
+                } else {
+                  await widget.store.updateFeed(existing['id'] as int, feedData, analysisData);
+                }
                 if (context.mounted) Navigator.pop(context, true);
               } catch (error) {
                 if (context.mounted) message(context, 'تعذر حفظ العلف: ' + error.toString());
@@ -154,7 +160,7 @@ class _FeedsPageState extends State<FeedsPage> {
       child: Row(children: [
         Expanded(child: Text('مكتبة الأعلاف: ' + records.length.toString(),
             style: Theme.of(context).textTheme.titleMedium)),
-        FilledButton.icon(onPressed: add, icon: const Icon(Icons.add), label: const Text('علف جديد')),
+        FilledButton.icon(onPressed: () => add(), icon: const Icon(Icons.add), label: const Text('علف جديد')),
       ]),
     ),
     Expanded(child: records.isEmpty
@@ -177,11 +183,18 @@ class _FeedsPageState extends State<FeedsPage> {
                   '\nالمصدر: ' + (f['source_type'] ?? 'غير متوفر').toString(),
                 ),
                 isThreeLine: true,
-                trailing: IconButton(
-                  tooltip: 'حذف العلف',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () => remove(f),
-                ),
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  IconButton(
+                    tooltip: 'تعديل العلف',
+                    icon: const Icon(Icons.edit_outlined),
+                    onPressed: () => add(f),
+                  ),
+                  IconButton(
+                    tooltip: 'حذف العلف',
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () => remove(f),
+                  ),
+                ]),
               ),
             );
           },
