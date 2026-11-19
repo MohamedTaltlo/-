@@ -18,9 +18,9 @@ class _CalculatorPageState extends State<CalculatorPage> {
   int? animalId;
   Map<String, Object?>? selectedAnimal;
   RationTargets? targets;
+  String? targetStage;
   RationAssessment? result;
   List<RationFeed> evaluatedFeeds = [];
-  List<Map<String, Object?>> evaluatedRows = [];
   String? blockingError;
   double? cost;
 
@@ -66,7 +66,7 @@ class _CalculatorPageState extends State<CalculatorPage> {
 
   Future<void> loadTargets() async {
     if (animalId == null) {
-      if (mounted) setState(() => targets = null);
+      if (mounted) setState(() { targets = null; targetStage = null; });
       return;
     }
     final row = await widget.store.target(animalId!);
@@ -85,6 +85,7 @@ class _CalculatorPageState extends State<CalculatorPage> {
     }
     setState(() {
       targets = t;
+      targetStage = row?['applicable_stage']?.toString();
       result = null;
       blockingError = null;
     });
@@ -190,7 +191,6 @@ class _CalculatorPageState extends State<CalculatorPage> {
 
   void calculate() {
     final chosen = <RationFeed>[];
-    final rows = <Map<String, Object?>>[];
     String? error;
     double sumCost = 0;
     bool knownCost = true;
@@ -229,7 +229,6 @@ class _CalculatorPageState extends State<CalculatorPage> {
         maxDailyAsFedKg: _num(feed['max_daily_kg']),
         analysisSource: (feed['source_type'] ?? '').toString(),
       ));
-      rows.add(feed);
     }
 
     if (error != null) {
@@ -239,15 +238,17 @@ class _CalculatorPageState extends State<CalculatorPage> {
       });
       return;
     }
-    final current = widget.store.target(animalId!);
-    // Deliberately do not await this access: the current cached goals are
-    // compared below; reloading targets happens on animal change/save.
-    current.ignore();
-    final assessment = const RationCalculator().evaluate(chosen, targets: targets);
+    final stageMatched = targets == null ||
+        targetStage == selectedAnimal?['life_stage']?.toString();
+    final assessment = const RationCalculator().evaluate(
+      chosen, targets: stageMatched ? targets : null,
+    );
+    if (!stageMatched) {
+      error = 'الاحتياجات تخص حالة إنتاجية مختلفة. حدّث الهدف قبل المقارنة.';
+    }
     setState(() {
-      blockingError = null;
+      blockingError = error;
       evaluatedFeeds = chosen;
-      evaluatedRows = rows;
       result = assessment;
       cost = knownCost ? sumCost : null;
     });
@@ -284,8 +285,7 @@ class _CalculatorPageState extends State<CalculatorPage> {
     if (animalId == null || result == null || result!.hasInvalidInputs ||
         evaluatedFeeds.isEmpty) return;
     final items = <Map<String, Object?>>[];
-    for (var i = 0; i < evaluatedFeeds.length; i++) {
-      final f = evaluatedFeeds[i];
+    for (final f in evaluatedFeeds) {
       items.add({
         'feed_name': f.name,
         'as_fed_kg': f.asFedKg,
@@ -383,7 +383,7 @@ class _CalculatorPageState extends State<CalculatorPage> {
         for (final warning in result!.warnings) notice(warning, icon: Icons.warning_amber),
         notice('مطابقة القيم المدخلة لا تعني أن الحصة متوازنة أو آمنة. الماء والمعادن والفيتامينات وعوامل الحالة الصحية خارج هذا التقييم.'),
         FilledButton.icon(
-          onPressed: result!.hasInvalidInputs || evaluatedFeeds.isEmpty ? null : save,
+          onPressed: result!.hasInvalidInputs || evaluatedFeeds.isEmpty || blockingError != null ? null : save,
           icon: const Icon(Icons.save_outlined),
           label: const Text('حفظ هذه الحصة في السجل'),
         ),
