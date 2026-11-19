@@ -126,6 +126,10 @@ class FarmStore {
   Future<int> addAnimal(Map<String, Object?> fields) =>
       db.insert('animals', fields);
 
+  Future<void> updateAnimal(int id, Map<String, Object?> fields) async {
+    await db.update('animals', fields, where: 'id = ?', whereArgs: [id]);
+  }
+
   Future<void> deleteAnimal(int id) async {
     await db.delete('animals', where: 'id = ?', whereArgs: [id]);
   }
@@ -164,6 +168,24 @@ class FarmStore {
       final id = await txn.insert('feeds', feed);
       await txn.insert('nutrition_feed_analyses', {'feed_id': id, ...analysis});
       return id;
+    });
+  }
+
+  Future<void> updateFeed(
+    int id,
+    Map<String, Object?> feed,
+    Map<String, Object?> analysis,
+  ) async {
+    await db.transaction((txn) async {
+      await txn.update('feeds', feed, where: 'id = ?', whereArgs: [id]);
+      final updated = await txn.update('nutrition_feed_analyses', analysis,
+          where: 'feed_id = ?', whereArgs: [id]);
+      if (updated == 0) {
+        await txn.insert('nutrition_feed_analyses', {
+          'feed_id': id,
+          ...analysis,
+        });
+      }
     });
   }
 
