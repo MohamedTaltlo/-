@@ -25,23 +25,25 @@ class _AnimalsPageState extends State<AnimalsPage> {
     if (mounted) setState(() { animals = data; loading = false; });
   }
 
-  Future<void> add() async {
-    final name = TextEditingController();
-    final tag = TextEditingController();
-    final weight = TextEditingController();
-    final birth = TextEditingController();
-    final pregnancy = TextEditingController();
-    final breeding = TextEditingController();
-    final milk = TextEditingController();
-    final kids = TextEditingController();
-    final bcs = TextEditingController();
-    String sex = 'أنثى';
-    String stage = 'صيانة';
+  Future<void> add([Map<String, Object?>? existing]) async {
+    final profile = existing == null ? null :
+        await widget.store.profile(existing['id'] as int);
+    final name = TextEditingController(text: existing?['name']?.toString() ?? '');
+    final tag = TextEditingController(text: existing?['identifier']?.toString() ?? '');
+    final weight = TextEditingController(text: existing?['weight_kg']?.toString() ?? '');
+    final birth = TextEditingController(text: existing?['birth_date']?.toString() ?? '');
+    final pregnancy = TextEditingController(text: profile?['pregnancy_stage']?.toString() ?? '');
+    final breeding = TextEditingController(text: profile?['breeding_date']?.toString() ?? '');
+    final milk = TextEditingController(text: profile?['daily_milk_kg']?.toString() ?? '');
+    final kids = TextEditingController(text: profile?['suckling_kids']?.toString() ?? '');
+    final bcs = TextEditingController(text: profile?['bcs_value']?.toString() ?? '');
+    String sex = (existing?['sex'] ?? 'أنثى').toString();
+    String stage = (existing?['life_stage'] ?? 'صيانة').toString();
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(builder: (context, change) {
         return AlertDialog(
-          title: const Text('إضافة حيوان'),
+          title: Text(existing == null ? 'إضافة حيوان' : 'تعديل بيانات الحيوان'),
           content: SizedBox(
             width: 420,
             child: SingleChildScrollView(
@@ -108,21 +110,34 @@ class _AnimalsPageState extends State<AnimalsPage> {
                 return;
               }
               try {
-                final id = await widget.store.addAnimal({
+                final animalData = <String, Object?>{
                   'identifier': tag.text.trim(),
                   'name': name.text.trim(),
                   'sex': sex,
                   'life_stage': stage,
                   'weight_kg': w,
                   'birth_date': birthDate.isEmpty ? null : birthDate,
-                  'measured_at': DateTime.now().toIso8601String(),
-                  'created_at': DateTime.now().toIso8601String(),
-                });
+                  'measured_at': existing != null &&
+                      (existing['weight_kg'] as num).toDouble() == w
+                      ? existing['measured_at']
+                      : DateTime.now().toIso8601String(),
+                };
+                int id;
+                if (existing == null) {
+                  id = await widget.store.addAnimal({
+                    ...animalData,
+                    'created_at': DateTime.now().toIso8601String(),
+                  });
+                } else {
+                  id = existing['id'] as int;
+                  await widget.store.updateAnimal(id, animalData);
+                }
                 await widget.store.saveProfile(id, {
-                  'pregnancy_stage': pregnancy.text.trim().isEmpty ? null : pregnancy.text.trim(),
-                  'breeding_date': bred.isEmpty ? null : bred,
-                  'daily_milk_kg': m,
-                  'suckling_kids': k?.toInt(),
+                  'pregnancy_stage': stage == 'حامل' && pregnancy.text.trim().isNotEmpty
+                      ? pregnancy.text.trim() : null,
+                  'breeding_date': stage == 'حامل' && bred.isNotEmpty ? bred : null,
+                  'daily_milk_kg': stage == 'مرضع' ? m : null,
+                  'suckling_kids': stage == 'مرضع' ? k?.toInt() : null,
                   'bcs_value': b,
                   'bcs_scale': b == null ? null : '1-5',
                 });
@@ -165,7 +180,7 @@ class _AnimalsPageState extends State<AnimalsPage> {
       child: Row(children: [
         Expanded(child: Text('عدد الحيوانات: ' + animals.length.toString(),
             style: Theme.of(context).textTheme.titleMedium)),
-        FilledButton.icon(onPressed: add, icon: const Icon(Icons.add),
+        FilledButton.icon(onPressed: () => add(), icon: const Icon(Icons.add),
             label: const Text('حيوان جديد')),
       ]),
     ),
@@ -187,11 +202,18 @@ class _AnimalsPageState extends State<AnimalsPage> {
                       ' • ' + number(a['weight_kg'] as double?) + ' كغ\n' +
                       'آخر قياس: ' + ((a['measured_at'] ?? '').toString().split('T').first)),
                   isThreeLine: true,
-                  trailing: IconButton(
-                    tooltip: 'حذف الحيوان وسجلاته',
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => remove(a),
-                  ),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    IconButton(
+                      tooltip: 'تعديل بيانات الحيوان',
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: () => add(a),
+                    ),
+                    IconButton(
+                      tooltip: 'حذف الحيوان وسجلاته',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => remove(a),
+                    ),
+                  ]),
                 ),
               );
             },
