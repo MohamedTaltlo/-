@@ -1,0 +1,69 @@
+name: Build Mazraati Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: Test and build offline APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Configure Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create standard Android host project
+        run: |
+          flutter create --project-name mazraati --org online.mtradius --platforms android .
+          rm -f test/widget_test.dart
+          sed -i 's/android:label="mazraati"/android:label="مزرعتي"/' android/app/src/main/AndroidManifest.xml
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Analyze source
+        run: flutter analyze
+
+      - name: Run deterministic tests
+        run: flutter test
+
+      - name: Build installable release APK
+        run: flutter build apk --release
+
+      - name: Prepare download
+        run: cp build/app/outputs/flutter-apk/app-release.apk mazraati.apk
+
+      - name: Attach APK to workflow run
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mazraati-Android-APK
+          path: mazraati.apk
+          if-no-files-found: error
+          retention-days: 60
+
+      - name: Publish APK at stable direct download URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload latest mazraati.apk --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create latest mazraati.apk --repo "$GITHUB_REPOSITORY" --title "Mazraati Android - Latest APK" --notes "Offline Arabic goat farm manager. Advisory nutrition calculations only; consult a veterinarian." --latest
+          fi
